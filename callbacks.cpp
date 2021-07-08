@@ -1,5 +1,7 @@
 #include "callbacks.h"
 
+struct mosquitto_message* recieved;
+
 void OnConnect(struct mosquitto* mosc, void* obj, int rc)
 {
 	std::cout << "MQTT connected with " << rc << " code" << std::endl;
@@ -15,6 +17,7 @@ void OnSubscribe(struct mosquitto* mosc, void* obj, int mid, int qos_count, cons
 void OnMessage(struct mosquitto* mosc, void* obj, const struct mosquitto_message* message)
 {
 	std::cout << "Yaaaahooo we have got a new message" << std::endl;
+	//mosquitto_message_copy(recieved, message);
 }
 void OnDisconnect(struct mosquitto* mosc, void* obj, int rc)
 {

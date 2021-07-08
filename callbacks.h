@@ -3,6 +3,9 @@
 #pragma once
 #include <mosquitto.h>
 #include <iostream>
+#include <QByteArray>
+
+extern struct mosquitto_message* recieved;
 
 void OnConnect(struct mosquitto* mosc, void* obj, int rc);
 void OnPublish(struct mosquitto* mosc, void* obj, int mid);

@@ -4,6 +4,9 @@
 #include <QMainWindow>
 #include <QString>
 
+#include <QThread>
+#include <chrono>
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -15,6 +18,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
 	void SetTheme();
+	void SetPic(QPixmap pm);
     ~MainWindow();
 
 private slots:
@@ -27,6 +31,8 @@ private slots:
     void on_move_backward_clicked();
 
     void on_left_rotate_clicked();
+
+	void on_On_clicked();
 
 private:
     Ui::MainWindow *ui;

@@ -11,11 +11,15 @@ CONFIG += c++11
 SOURCES += \
     callbacks.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    msqtt.cpp \
+    recognition.cpp
 
 HEADERS += \
     callbacks.h \
-    mainwindow.h
+    mainwindow.h \
+    msqtt.h \
+    recognition.h
 
 FORMS += \
     mainwindow.ui
