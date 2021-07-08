@@ -38,6 +38,7 @@ public class RobotControl : MonoBehaviour
     public static Vector3 currentPosition;
     public static Quaternion currentRotation;
 
+    public AutoPilot auto = new AutoPilot();
     public enum State
     {
         WAITING = 0,
@@ -51,9 +52,8 @@ public class RobotControl : MonoBehaviour
 
     void Awake()
     {
-        SetState(State.CHECK_ROTATION);
         GetWheels();
-        camera = FindObjectOfType<Camera>();
+        camera = GetComponentInChildren<Camera>();
         //CreateClient();
         gatePos = gate.transform.position;
         SetStartPosition();
@@ -62,9 +62,8 @@ public class RobotControl : MonoBehaviour
     void FixedUpdate()
     {
         UpdateCurrentPosition();
-        Auto.CheckRotation(State.PAUSE);
-        Auto.Pause(State.CHECK_MOVING, 2);
-        Auto.CheckMoving(State.WAITING);
+        auto.ChangeAction();
+        auto.action();
     }
 
     private void LateUpdate()
@@ -146,12 +145,64 @@ public class RobotControl : MonoBehaviour
         client.Publish(imageTopic, message, MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE, false);
     }
 
-    public static class Auto
+    public class AutoPilot
     {
-        public static float currRot;
+        public List<State> stateSequence = new List<State>(); //очередь состояний, через воторые проходит робот
+        private int listIterator = 0;
+        private bool inAction = false;
+
         public static float checkTime = 0;
         public static float rotationAnglePerSecond = 0;
         public static float distancePerSecond = 0;
+        public static float pauseTime = 2f;
+        //public static bool atHomePosition;
+
+        public delegate void Action();
+        public Action action;
+
+        public AutoPilot()
+        {
+            stateSequence.Add(State.CHECK_ROTATION);
+            stateSequence.Add(State.PAUSE);
+            stateSequence.Add(State.CHECK_MOVING);
+            stateSequence.Add(State.PAUSE);
+        }
+
+        public void ChangeAction()
+        {
+            if (!inAction)
+            {
+                if (listIterator < stateSequence.Count)
+                {
+                    SetState(stateSequence[listIterator++]);
+                    switch (state)
+                    {
+                        case State.PAUSE:
+                            {
+                                action = Pause;
+                                break;
+                            }
+
+                        case State.CHECK_ROTATION:
+                            {
+                                action = CheckRotation;
+                                break;
+                            }
+
+                        case State.CHECK_MOVING:
+                            {
+                                action = CheckMoving;
+                                break;
+                            }
+
+                        case State.FIND_PUCK:
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
 
         public static void BrakesOff()
         {
@@ -165,16 +216,17 @@ public class RobotControl : MonoBehaviour
             rightWheel.brakeTorque = maxBrakeTorque;
         }
 
-        public static void CheckRotation(in State outState)
+        public void CheckRotation()
         {
             if (state == State.CHECK_ROTATION)
             {
+                inAction = true;
                 if (checkTime > 1)
                 {
                     BrakesOn();
                     rotationAnglePerSecond = Math.Abs(startRotation.eulerAngles.y - currentRotation.eulerAngles.y) / checkTime;
                     checkTime = 0;
-                    SetState(outState);
+                    inAction = false;
                 }
                 else
                 {
@@ -186,16 +238,17 @@ public class RobotControl : MonoBehaviour
             }
         }
 
-        public static void CheckMoving(in State outState)
+        public void CheckMoving()
         {
             if (state == State.CHECK_MOVING)
             {
+                inAction = true;
                 if (checkTime > 1)
                 {
                     BrakesOn();
                     distancePerSecond = (startPosition - currentPosition).magnitude / checkTime;
                     checkTime = 0;
-                    SetState(outState);
+                    inAction = false;
                 }
                 else
                 {
@@ -207,14 +260,15 @@ public class RobotControl : MonoBehaviour
             }
         }
 
-        public static void Pause(in State outState, float pauseTime)
+        public void Pause()
         {
             if (state == State.PAUSE)
             {
+                inAction = true;
                 if (checkTime > pauseTime)
                 {
+                    inAction = false;
                     checkTime = 0;
-                    SetState(outState);
                 }
                 else
                 {
@@ -228,7 +282,11 @@ public class RobotControl : MonoBehaviour
             if (checkTime > angle / rotationAnglePerSecond)
             {
                 BrakesOn();
-                checkTime = 0;
+                checkTime += Time.fixedDeltaTime;
+                if (checkTime > 3)
+                {
+                    checkTime = 0;
+                }
             }
             else
             {
@@ -244,7 +302,11 @@ public class RobotControl : MonoBehaviour
             if (checkTime > distance / distancePerSecond)
             {
                 BrakesOn();
-                checkTime = 0;
+                checkTime += Time.fixedDeltaTime;
+                if (checkTime > 3)
+                {
+                    checkTime = 0;
+                }
             }
             else
             {
@@ -255,5 +317,4 @@ public class RobotControl : MonoBehaviour
             }
         }
     }
-
 }
