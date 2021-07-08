@@ -17,7 +17,6 @@ void OnSubscribe(struct mosquitto* mosc, void* obj, int mid, int qos_count, cons
 void OnMessage(struct mosquitto* mosc, void* obj, const struct mosquitto_message* message)
 {
 	std::cout << "Yaaaahooo we have got a new message" << std::endl;
-	//mosquitto_message_copy(recieved, message);
 }
 void OnDisconnect(struct mosquitto* mosc, void* obj, int rc)
 {
