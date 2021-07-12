@@ -5,56 +5,67 @@ using uPLibrary.Networking.M2Mqtt;
 using uPLibrary.Networking.M2Mqtt.Messages;
 using UnityEngine;
 using System;
-using System.Net;
+using System.Globalization;
 
 public class RobotControl : MonoBehaviour
 {
-    public int? command = null;
-
     public GameObject gate;
     private Vector3 gatePos;
-
-    public Camera camera;
-
-    float time = 0;
-
-    private int textureWidth = 480;
-
-    private const string brokerAdress = "localhost";
-    private const string imageTopic = "/image";
-    private const string posTopic = "/position";
-    private const string commandTopic = "/comand";
-
-    public MqttClient client;
-
-    public static WheelCollider leftWheel;
-    public static WheelCollider rightWheel;
-    public static float maxMotorTorque = 1f;
-    public static float maxBrakeTorque = 500f;
-    public static float rotationFactor = 5f;
 
     public static Vector3 startPosition;
     public static Quaternion startRotation;
     public static Vector3 currentPosition;
     public static Quaternion currentRotation;
 
-    public AutoPilot auto = new AutoPilot();
-    public enum State
+    public enum ControlType
     {
-        WAITING = 0,
-        PAUSE,
-        CHECK_ROTATION,
-        CHECK_MOVING,
-        FIND_PUCK,
+        NO = 0,
+        AUTO,
+        MANUAL
     }
 
-    public static State state;
+    public static ControlType controlType { get; set; } = ControlType.NO;
+
+    public enum State
+    {
+        PAUSE = 0,
+        //auto
+        CHECK_ROTATION = 1,
+        CHECK_MOVING = 2,
+        STR_M = 3,
+        ROT = 4,
+        //manual
+        STR_M_F = 5,
+        STR_M_B = 6,
+        ROT_R = 7,
+        ROT_L = 8,
+    }
+
+    public static State state { get; set; }
+
+    public MQTTClient client;
+
+    public AutoPilot auto;
+    public Manual manual;
+
+    public WheelController whellController;
+    public RobotCamera robotCamera;
 
     void Awake()
     {
+        client = new MQTTClient();
+        client.CreateClient();
+
+        auto = new AutoPilot();
+        manual = new Manual();
+
+        whellController = new WheelController();
         GetWheels();
-        camera = GetComponentInChildren<Camera>();
-        //CreateClient();
+
+        robotCamera = new RobotCamera();
+        robotCamera.GetClient(client);
+        GetCamera();
+
         gatePos = gate.transform.position;
         SetStartPosition();
     }
@@ -62,13 +73,126 @@ public class RobotControl : MonoBehaviour
     void FixedUpdate()
     {
         UpdateCurrentPosition();
-        auto.ChangeAction();
-        auto.action();
+        if (controlType == ControlType.MANUAL)
+        {
+            manual.DoAction();
+        }
+        if (controlType == ControlType.AUTO)
+        {
+            auto.DoAction();
+        }
     }
 
     private void LateUpdate()
     {
-        //GetFrame();
+        robotCamera.GetFrame();
+    }
+
+    public class MQTTClient
+    {
+        private static string brokerAdress { get; set; } = "localhost";
+        public static string imageTopic { get; private set; } = "/image";
+        public static string autoTopic { get; private set; } = "/command/auto";
+        public static string manualTopic { get; private set; } = "/command/manual";
+        public static string modeTopic { get; private set; } = "/command/mode";
+
+        private NumberFormatInfo formatInfo = new NumberFormatInfo() { NumberDecimalSeparator = "." };
+        private char[] separators = new char[] { ';' };
+
+        public MqttClient client { get; private set; }
+
+        public void CreateClient()
+        {
+            client = new MqttClient(brokerAdress);
+
+            client.MqttMsgPublishReceived += Receive;
+            client.Connect(Guid.NewGuid().ToString());
+            client.Subscribe(new string[] { "#" }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
+
+        }
+
+        private void Receive(object sender, MqttMsgPublishEventArgs e)
+        {
+            if (e.Topic == autoTopic)
+            {
+                string Command = "";
+                foreach (var item in e.Message)
+                {
+                    Command += Convert.ToChar(item);
+                }
+                string[] splitCommand = Command.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+                AutoPilot.AddCommandToStateSequence((int.Parse(splitCommand[0]), float.Parse(splitCommand[1], formatInfo)));
+            }
+
+            if (e.Topic == manualTopic)
+            {
+                string Command = "";
+                foreach (var item in e.Message)
+                {
+                    Command += Convert.ToChar(item);
+                }
+                Manual.SetCommand(int.Parse(Command));
+                Debug.Log("Manual Mode " + (int.Parse(Command)).ToString());
+            }
+
+            if (e.Topic == modeTopic)
+            {
+                string Command = "";
+                foreach (var item in e.Message)
+                {
+                    Command += Convert.ToChar(item);
+                }
+                
+                controlType = (ControlType)int.Parse(Command);
+                Debug.Log("Command Mode " + controlType.ToString());
+            }
+        }
+
+        public void PublishImage(byte[] message)
+        {
+            client.Publish(imageTopic, message, MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE, false);
+        }
+    }
+
+    public class RobotCamera : MonoBehaviour
+    {
+        public static Camera camera { get; set; }
+
+        private static float captureTime { get; set; } = 0.2f;
+        public static int textureWidth { get; private set; } = 640;
+        private float time = 0;
+
+        private MQTTClient cachedClient;
+
+
+        public void GetClient(MQTTClient _client)
+        {
+            cachedClient = _client;
+        }
+
+        public void GetFrame()
+        {
+            if ((time += Time.deltaTime) > captureTime)
+            {
+                var RT = new RenderTexture(textureWidth, (textureWidth * 3) / 4, 24);
+                RenderTexture.active = RT;
+                var image = new Texture2D(RT.width, RT.height, TextureFormat.RGB24, false);
+                RobotCamera.camera.targetTexture = RT;
+                RobotCamera.camera.Render();
+                image.ReadPixels(new Rect(0, 0, textureWidth, (textureWidth * 3) / 4), 0, 0);
+                image.Apply();
+
+                byte[] bytes = image.EncodeToJPG();
+                //byte[] pixels = image.GetRawTextureData();
+                //RenderTexture.active = null;
+                //camera.targetDisplay = 1;
+                //File.WriteAllBytes("D:/Capture/" + Time.time + ".bin", pixels);;
+                //File.WriteAllBytes("D:/Capture/" + Time.time + ".jpg", bytes);
+
+                cachedClient.PublishImage(bytes);
+                time = 0;
+            }
+        }
     }
 
     public static void SetState(State _state)
@@ -88,120 +212,18 @@ public class RobotControl : MonoBehaviour
         currentRotation = transform.rotation;
     }
 
-    private void GetWheels()
+    public class WheelController : MonoBehaviour
     {
-        WheelCollider[] wheels = new WheelCollider[2];
-        wheels = GetComponentsInChildren<WheelCollider>();
-        leftWheel = wheels[0];
-        rightWheel = wheels[1];
-    }
-
-    public void CreateClient()
-    {
-        client = new MqttClient(brokerAdress);
-
-        client.MqttMsgPublishReceived += Client_MqttMsgPublishReceived;
-
-        string clientId = Guid.NewGuid().ToString();
-        client.Connect(clientId);
-        client.Subscribe(new string[] { imageTopic }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
-        client.Subscribe(new string[] { commandTopic }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
-    }
-
-    private void Client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
-    {
-        if (e.Topic == commandTopic)
+        public static WheelCollider leftWheel;
+        public static WheelCollider rightWheel;
+        private static float maxMotorTorque { get; set; } = 1f;
+        private static float maxBrakeTorque { get; set; } = 500f;
+        private static float rotationFactor { get; set; } = 5f;
+        
+        public static void BrakesOn()
         {
-            command = e.Message[0];
-        }
-    }
-
-    public void GetFrame()
-    {
-        if ((time += Time.deltaTime) > 1)
-        {
-            var RT = new RenderTexture(textureWidth, (textureWidth * 3) / 4, 24);
-            RenderTexture.active = RT;
-            var image = new Texture2D(RT.width, RT.height, TextureFormat.RGB24, false);
-            camera.targetTexture = RT;
-            camera.Render();
-            image.ReadPixels(new Rect(0, 0, textureWidth, (textureWidth * 3) / 4), 0, 0);
-            image.Apply();
-
-            byte[] bytes = image.EncodeToJPG();
-            //byte[] pixels = image.GetRawTextureData();
-            RenderTexture.active = null;
-            //camera.targetDisplay = 1;
-            //File.WriteAllBytes("D:/Capture/" + counter++ + ".bin", pixels);;
-            //File.WriteAllBytes("D:/Capture/" + counter++ + ".jpg", bytes);
-
-            PublishImage(client, bytes);
-            time = 0;
-        }
-    }
-
-    public static void PublishImage(MqttClient client, byte[] message)
-    {
-        client.Publish(imageTopic, message, MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE, false);
-    }
-
-    public class AutoPilot
-    {
-        public List<State> stateSequence = new List<State>(); //очередь состояний, через воторые проходит робот
-        private int listIterator = 0;
-        private bool inAction = false;
-
-        public static float checkTime = 0;
-        public static float rotationAnglePerSecond = 0;
-        public static float distancePerSecond = 0;
-        public static float pauseTime = 2f;
-        //public static bool atHomePosition;
-
-        public delegate void Action();
-        public Action action;
-
-        public AutoPilot()
-        {
-            stateSequence.Add(State.CHECK_ROTATION);
-            stateSequence.Add(State.PAUSE);
-            stateSequence.Add(State.CHECK_MOVING);
-            stateSequence.Add(State.PAUSE);
-        }
-
-        public void ChangeAction()
-        {
-            if (!inAction)
-            {
-                if (listIterator < stateSequence.Count)
-                {
-                    SetState(stateSequence[listIterator++]);
-                    switch (state)
-                    {
-                        case State.PAUSE:
-                            {
-                                action = Pause;
-                                break;
-                            }
-
-                        case State.CHECK_ROTATION:
-                            {
-                                action = CheckRotation;
-                                break;
-                            }
-
-                        case State.CHECK_MOVING:
-                            {
-                                action = CheckMoving;
-                                break;
-                            }
-
-                        case State.FIND_PUCK:
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            }
+            leftWheel.brakeTorque = maxBrakeTorque;
+            rightWheel.brakeTorque = maxBrakeTorque;
         }
 
         public static void BrakesOff()
@@ -210,57 +232,164 @@ public class RobotControl : MonoBehaviour
             rightWheel.brakeTorque = 0f;
         }
 
-        public static void BrakesOn()
+        public static void ForwardMotorTorque()
         {
-            leftWheel.brakeTorque = maxBrakeTorque;
-            rightWheel.brakeTorque = maxBrakeTorque;
+            leftWheel.motorTorque = maxMotorTorque;
+            rightWheel.motorTorque = maxMotorTorque;
         }
 
-        public void CheckRotation()
+        public static void BackwardMotorTorque()
+        {
+            leftWheel.motorTorque = -maxMotorTorque;
+            rightWheel.motorTorque = -maxMotorTorque;
+        }
+
+        public static void RightRotateTorque()
+        {
+            leftWheel.motorTorque = maxMotorTorque / rotationFactor;
+            rightWheel.motorTorque = -maxMotorTorque / rotationFactor;
+        }
+
+        public static void LeftRotateTorque()
+        {
+            leftWheel.motorTorque = -maxMotorTorque / rotationFactor;
+            rightWheel.motorTorque = maxMotorTorque / rotationFactor;
+        }
+    }
+
+    public void GetCamera()
+    {
+        RobotCamera.camera = GetComponentInChildren<Camera>();
+    }
+
+    public void GetWheels()
+    {
+        WheelCollider[] wheels = GetComponentsInChildren<WheelCollider>();
+        WheelController.leftWheel = wheels[0];
+        WheelController.rightWheel = wheels[1];
+    }
+
+    public class AutoPilot
+    {
+        public static List<(State, float)> stateSequence = new List<(State, float)>(); //the sequence of states that the robot passes through
+        public int listIterator { get; private set; }
+        public float commandValue { get; private set; }
+        public bool inAction { get; private set; }
+        public static bool isValueUnderZero { get; private set; }
+
+        private static float checkTime { get; set; } = 0;
+        private static float rotationAnglePerSecond { get; set; } = 0;
+        private static float distancePerSecond { get; set; } = 0;
+        //public static float pauseTime = 2f;
+
+        public delegate void Action(float value);
+        public Action action;
+
+        public AutoPilot()
+        {
+            listIterator = 0;
+            AddCommandToStateSequence((0, 5f));
+            AddCommandToStateSequence((1, 2f));
+            AddCommandToStateSequence((2, 2f));
+        }
+
+        public static void AddCommandToStateSequence((int, float) _command)
+        {
+            isValueUnderZero = (_command.Item2 < 0) ? true : false;
+            stateSequence.Add(((State)_command.Item1, _command.Item2));
+            //Debug.Log("command " + (State)_command.Item1 + " added with value " + _command.Item2);
+        }
+
+        public void DoAction()
+        {
+            if (!inAction && listIterator < stateSequence.Count)
+            {
+                state = (stateSequence[listIterator].Item1);
+                commandValue = stateSequence[listIterator].Item2;
+                listIterator++;
+
+                switch (state)
+                {
+                    case State.PAUSE:
+                        {
+                            action = Pause;
+                            break;
+                        }
+
+                    case State.CHECK_ROTATION:
+                        {
+                            action = CheckRotation;
+                            break;
+                        }
+
+                    case State.CHECK_MOVING:
+                        {
+                            action = CheckMoving;
+                            break;
+                        }
+
+                    case State.STR_M:
+                        {
+                            action = StraightMove;
+                            break;
+                        }
+                    case State.ROT:
+                        {
+                            action = Rotation;
+                            break;
+                        }
+                    default:
+                        break;
+                }
+            }
+            action(commandValue);
+        }
+
+        public void CheckRotation(float checkTimeValue)
         {
             if (state == State.CHECK_ROTATION)
             {
                 inAction = true;
-                if (checkTime > 1)
+                if (checkTime > checkTimeValue)
                 {
-                    BrakesOn();
+                    WheelController.BrakesOn();
                     rotationAnglePerSecond = Math.Abs(startRotation.eulerAngles.y - currentRotation.eulerAngles.y) / checkTime;
                     checkTime = 0;
                     inAction = false;
+                    AddCommandToStateSequence((0, 1f));
                 }
                 else
                 {
-                    BrakesOff();
-                    leftWheel.motorTorque = maxMotorTorque / rotationFactor;
-                    rightWheel.motorTorque = -maxMotorTorque / rotationFactor;
+                    WheelController.BrakesOff();
+                    WheelController.RightRotateTorque();
                     checkTime += Time.fixedDeltaTime;
                 }
             }
         }
 
-        public void CheckMoving()
+        public void CheckMoving(float checkTimeValue)
         {
             if (state == State.CHECK_MOVING)
             {
                 inAction = true;
-                if (checkTime > 1)
+                if (checkTime > checkTimeValue)
                 {
-                    BrakesOn();
+                    WheelController.BrakesOn();
                     distancePerSecond = (startPosition - currentPosition).magnitude / checkTime;
                     checkTime = 0;
                     inAction = false;
+                    AddCommandToStateSequence((0, 1f));
                 }
                 else
                 {
-                    BrakesOff();
-                    leftWheel.motorTorque = maxMotorTorque;
-                    rightWheel.motorTorque = maxMotorTorque;
+                    WheelController.BrakesOff();
+                    WheelController.ForwardMotorTorque();
                     checkTime += Time.fixedDeltaTime;
                 }
             }
         }
 
-        public void Pause()
+        private void Pause(float pauseTime)
         {
             if (state == State.PAUSE)
             {
@@ -277,44 +406,137 @@ public class RobotControl : MonoBehaviour
             }
         }
 
-        public static void Rotate(float angle) //angle тоже условная величина, будет требоваться корректировка
+        public void Rotation(float rotationAngleValue)
         {
-            if (checkTime > angle / rotationAnglePerSecond)
+            if (state == State.ROT)
             {
-                BrakesOn();
-                checkTime += Time.fixedDeltaTime;
-                if (checkTime > 3)
+                inAction = true;
+                if (checkTime > Math.Abs(rotationAngleValue) / rotationAnglePerSecond)
                 {
+                    WheelController.BrakesOn();
+                    AddCommandToStateSequence((0, 1f));
                     checkTime = 0;
+                    inAction = false;
+                }
+                else
+                {
+                    WheelController.BrakesOff();
+                    if (isValueUnderZero)
+                    {
+                        WheelController.LeftRotateTorque();
+                    }
+                    else
+                    {
+                        WheelController.RightRotateTorque();
+                    }
+                    checkTime += Time.fixedDeltaTime;
                 }
             }
-            else
-            {
-                BrakesOff();
-                leftWheel.motorTorque = maxMotorTorque / rotationFactor;
-                rightWheel.motorTorque = -maxMotorTorque / rotationFactor;
-                checkTime += Time.fixedDeltaTime;
-            }
-        } 
-        
-        public static void StraightMove(float distance) //distance -- условное расстояние, требует подстроечного коэффициента
+        }
+
+        public void StraightMove(float distanceValue)
         {
-            if (checkTime > distance / distancePerSecond)
+            if (state == State.STR_M)
             {
-                BrakesOn();
-                checkTime += Time.fixedDeltaTime;
-                if (checkTime > 3)
+                inAction = true;
+                if (checkTime > Math.Abs(distanceValue) / distancePerSecond)
                 {
+                    WheelController.BrakesOn();
+                    AddCommandToStateSequence((0, 1f));
                     checkTime = 0;
+                    inAction = false;
                 }
-            }
-            else
-            {
-                BrakesOff();
-                leftWheel.motorTorque = maxMotorTorque;
-                rightWheel.motorTorque = maxMotorTorque;
-                checkTime += Time.fixedDeltaTime;
+                else
+                {
+                    WheelController.BrakesOff();
+                    if (isValueUnderZero)
+                    {
+                        WheelController.BackwardMotorTorque();
+                    }
+                    else
+                    {
+                        WheelController.ForwardMotorTorque();
+                    }
+                    checkTime += Time.fixedDeltaTime;
+                }
             }
         }
     }
+
+    public class Manual
+    {
+        public delegate void Action();
+        public Action action;
+        private static State state { get; set; } = State.PAUSE;
+
+        public void DoAction()
+        {
+            switch (state)
+            {
+                case State.PAUSE:
+                    {
+                        action = Pause;
+                        break;
+                    }
+                case State.STR_M_F:
+                    {
+                        action = ForwardMove;
+                        break;
+                    }
+                case State.STR_M_B:
+                    {
+                        action = BackwardMove;
+                        break;
+                    }
+                case State.ROT_L:
+                    {
+                        action = RotateLeft;
+                        break;
+                    }
+                case State.ROT_R:
+                    {
+                        action = RotateRight;
+                        break;
+                    }
+                default:
+                    break;
+            }
+            action();
+        }
+
+        public static void SetCommand(int stateNum)
+        {
+            state = (State)stateNum;
+        }
+
+        public void Pause()
+        {
+            WheelController.BrakesOn();
+        }
+
+        public void RotateLeft()
+        {
+            WheelController.BrakesOff();
+            WheelController.LeftRotateTorque();
+        }
+
+        public void RotateRight()
+        {
+            WheelController.BrakesOff();
+            WheelController.RightRotateTorque();
+        }
+
+        public void ForwardMove()
+        {
+            WheelController.BrakesOff();
+            WheelController.ForwardMotorTorque();
+        }
+
+        public void BackwardMove()
+        {
+            WheelController.BrakesOff();
+            WheelController.BackwardMotorTorque();
+        }
+    }
 }
+
