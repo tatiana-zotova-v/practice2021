@@ -7,7 +7,7 @@ using namespace sf;
 
 int main()
 {
-	myMosq mm("client1", "#", "127.0.0.1", 1883);
+	myMosq mm("client1", "#", "127.0.0.1", 1883);//5.145.239.73
 	int mid = 0;
 	mm.subscribe(&mid, "#", 2);
 
@@ -46,14 +46,16 @@ int main()
 				window.close();
 		}
 
-		if (!cnt)//(recieved != nullptr)
+		message_lock.lock();
+		if (recieved.payload != nullptr)
 		{
-			cnt++;
+	//		cnt++;
 		   /* 
 			* ѕреобразование массива байт в картинку, распознавание, установка на экран
 			* ѕока не провер€ли исправность работы этого блока
-			heroimage.loadFromMemory(recieved->payload, recieved->payloadlen);
-			cv::Mat img_mat = sfml2opencv(heroimage);
+			*/
+			image.loadFromMemory(recieved.payload, recieved.payloadlen);
+			cv::Mat img_mat = sfml2opencv(image);
 			cv::Mat thresholded = GetThresholdedMat(img_mat);
 
 			std::vector<std::vector<cv::Point>> contours;
@@ -65,20 +67,21 @@ int main()
 
 			texture.loadFromImage(result);
 
-			sprite.setTexture(herotexture);
+			sprite.setTexture(texture);
 			sprite.setPosition(50, 25);
-		   */
-			char* str = new char[recieved->payloadlen];
-			str = static_cast<char*>(recieved->payload);
-			for (int i = 0; i < recieved->payloadlen; i++)
+		   //*/
+			/*
+			char* str = new char[recieved.payloadlen];
+			str = static_cast<char*>(recieved.payload);
+			for (int i = 0; i < recieved.payloadlen; i++)
 			{
 				std::cout << str[i];
 			}
 			std::cout << std::endl;
-
-			//mosquitto_message_free(&recieved);
-			cnt = 1;
+			*/
+			recieved.payload = nullptr;
 		}
+		message_lock.unlock();
 
 		window.clear();
 		window.draw(sprite);

@@ -3,10 +3,13 @@
 #include "recognition.h"
 #include <iostream>
 #include <mosquittopp.h>
+#include <mutex>
 #pragma comment (lib, "mosquittopp.lib")
 #pragma comment (lib, "mosquitto.lib")
 
-extern struct mosquitto_message* recieved;
+extern std::mutex message_lock;
+extern struct mosquitto_message recieved;
+//extern struct mosquitto_message** recievedPtr;
 extern int cnt;
 
 class myMosq : public mosqpp::mosquittopp
