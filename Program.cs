@@ -252,7 +252,7 @@ namespace window_core
 
         public ImageShow()
         {
-            image = new SFML.Graphics.Image("C:\\Users\\Kactus\\source\\repos\\operator5\\bin\\Debug\\net5.0\\defaultImage.jpg");
+            image = new SFML.Graphics.Image("C:\\Users\\Kactus\\source\\repos\\operator5\\bin\\Debug\\net5.0\\defaultImage.jpg");//for test
             texture = new Texture(image);
             sprite = new Sprite(texture);
             sprite.Position = new Vector2f(5, 5);
