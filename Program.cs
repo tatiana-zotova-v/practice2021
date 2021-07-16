@@ -154,8 +154,9 @@ namespace window_core
                 {
                     image.UpdateTexture(MQTTClient.recivedImageBytes);
                     reco.CreateImg();
-                    reco.AngleTurn(reco.RefreshHSV());
+                    reco.AngleTurn();
                 }
+                
                 window.Clear(backgroundColor);
                 window.Draw(image.sprite);
                 AddButtonsToDraw();
@@ -252,7 +253,7 @@ namespace window_core
 
         public ImageShow()
         {
-            image = new SFML.Graphics.Image("C:\\Users\\Kactus\\source\\repos\\operator5\\bin\\Debug\\net5.0\\defaultImage.jpg");
+            image = new SFML.Graphics.Image("C:\\Users\\Kactus\\source\\repos\\operator5\\bin\\Debug\\net5.0\\defaultImage.jpg"); 
             texture = new Texture(image);
             sprite = new Sprite(texture);
             sprite.Position = new Vector2f(5, 5);
@@ -272,35 +273,31 @@ namespace window_core
 
     class ImageRecognition
     {
-        public Mat img { get; private set; } = new Mat();
+        public Mat mat { get; private set; } 
+        public Image<Hsv, byte> image { get; private set; } = null;  
         public int noResultFound { get; private set; } = 0;
 
+
         public static int time = 0;
+        public ImageRecognition()
+        {
+            mat = new Mat();
+        }
 
         public void CreateImg()
         {
-            CvInvoke.Imdecode(MQTTClient.recivedImageBytes, Emgu.CV.CvEnum.ImreadModes.Unchanged, img);
-            img.Save("D:\\convert\\in" + time++.ToString() + ".jpg");
+            CvInvoke.Imdecode(MQTTClient.recivedImageBytes, Emgu.CV.CvEnum.ImreadModes.Unchanged, mat);
+            CvInvoke.CvtColor(mat, mat, Emgu.CV.CvEnum.ColorConversion.Rgb2HsvFull);
+            image = mat.ToImage<Hsv, byte>();
         }
 
-        public Mat RefreshHSV()
+        public/* List<(string, string)>*/ void AngleTurn() //it will return List with command sequence 
         {
-            Mat newMat = new Mat();
-            CvInvoke.CvtColor(img, newMat, Emgu.CV.CvEnum.ColorConversion.YCrCb2Rgb);
             
-            Mat result = new Mat();
-            newMat.Save("D:\\convert\\hsv" + time++.ToString() + ".jpg");
-            CvInvoke.InRange(newMat, new ScalarArray(new MCvScalar(200, 65, 30)), new ScalarArray(new MCvScalar(250, 100, 100)), result);
-            CvInvoke.Erode(result, result, null, new Point(-1, -1), 1, Emgu.CV.CvEnum.BorderType.Constant, CvInvoke.MorphologyDefaultBorderValue);
-            CvInvoke.Dilate(result, result, null, new Point(-1, -1), 1, Emgu.CV.CvEnum.BorderType.Constant, CvInvoke.MorphologyDefaultBorderValue);
-                       
-            return result;
-        }
-
-        public /*List<(string, string)>*/ void AngleTurn(Mat findIn)
-        {
+            Image<Gray, byte> ranged = image.InRange(new Hsv(80, 126, 75), new Hsv(90, 230, 220));
             VectorOfVectorOfPoint contours = new VectorOfVectorOfPoint();
-            int[,] hierarchy = CvInvoke.FindContourTree(findIn, contours, Emgu.CV.CvEnum.ChainApproxMethod.ChainApproxSimple);
+
+            int[,] hierarchy = CvInvoke.FindContourTree(ranged, contours, Emgu.CV.CvEnum.ChainApproxMethod.ChainApproxSimple);
             List<Rectangle> rectangles = new List<Rectangle>();
 
             for (int i = 0; i < contours.Size; ++i)
@@ -334,8 +331,8 @@ namespace window_core
                 else
                 {
                     List<(string, string)> commands = new List<(string, string)>();
-                    double xUVpos = Convert.ToDouble((rectangles[0].X + rectangles[0].Width / 2)) / 640d;
-                    double angleToTurn = Convert.ToSingle(Math.Atan((xUVpos - 0.5d) * 0.6d / 0.3d) * 180d / Math.PI);
+                    double xUVpos = Convert.ToDouble((rectangles[0].X + rectangles[0].Width / 2))  / Convert.ToDouble(image.Width);
+                    double angleToTurn = Convert.ToDouble(Math.Atan((xUVpos - 0.5d) * 0.6d / 0.3d) * 180d / Math.PI);
                     commands.Add(("4;" + Math.Round(angleToTurn, 2).ToString(), MQTTClient.autoTopic));
                     commands.Add(("0;1", MQTTClient.autoTopic));
                     //return commands;
