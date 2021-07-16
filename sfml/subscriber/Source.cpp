@@ -19,7 +19,7 @@ int main()
 		mosquitto_message_callback_set(mosq, OnMessage);
 		mosquitto_disconnect_callback_set(mosq, OnDisconnect);
 
-		Connect = (mosquitto_connect(mosq, "127.0.0.1", 1883, 60) == MOSQ_ERR_SUCCESS) ? true : false;//5.145.246.237
+		Connect = (mosquitto_connect(mosq, "5.145.246.237", 1883, 60) == MOSQ_ERR_SUCCESS) ? true : false;//5.145.246.237
 
 		mosquitto_loop_start(mosq);
 
@@ -27,28 +27,22 @@ int main()
 		mosquitto_subscribe(mosq, &mid0, "#", 2);
 	}
 
-	sf::RenderWindow window(sf::VideoMode(640, 480), "RobotControl"); 
+	sf::RenderWindow window(sf::VideoMode(650, 490), "RobotControl"); 
 	
 	sf::Image* image = nullptr; 
 	sf::Image* result = nullptr;
 	std::vector<std::vector<cv::Point>> contours;
 
-	sf::Texture* texture = nullptr;
-
-	sf::Sprite* sprite = nullptr;
-
 	cv::Mat* img_mat = nullptr;
 	cv::Mat* thresholded = nullptr;
-	
-	image = new sf::Image;
-	image->loadFromFile("C:/Users/MI/QtProject/bot_HMI/5.jpg");
-	
-	texture = new sf::Texture;
-	texture->loadFromImage(*image);
 
-	sprite = new sf::Sprite;
-	sprite->setTexture(*texture);
-	sprite->setPosition(5, 5);
+	sf::Texture texture;
+	sf::Sprite sprite;
+
+	texture.loadFromFile("C:/Users/MI/QtProject/bot_HMI/N0YPJp.jpg");
+
+	sprite.setTexture(texture);
+	sprite.setPosition(5, 5);
 	
 	recieved.payload = nullptr;
 
@@ -70,32 +64,34 @@ int main()
 				if (topic == topics[0])
 				{
 					image = new sf::Image;
-					image->loadFromMemory(recieved.payload, recieved.payloadlen);
-					img_mat = new cv::Mat;
-					*img_mat = sfml2opencv(image);
-					thresholded = new cv::Mat;
-					*thresholded = GetThresholdedMat(img_mat/*, static_cast<int>(PUCK)*/);
+					if (image->loadFromMemory(recieved.payload, recieved.payloadlen))
+					{
+						img_mat = new cv::Mat;
+						*img_mat = sfml2opencv(image);
+						thresholded = new cv::Mat;
+						*thresholded = GetThresholdedMat(img_mat/*, static_cast<int>(PUCK)*/);
 
-					std::vector<std::vector<cv::Point>> contours;
+						std::vector<std::vector<cv::Point>> contours;
 
-					result = new sf::Image;
-					*result = GetCountorsPic(thresholded, img_mat, contours);
+						result = new sf::Image;
+						*result = GetCountorsPic(thresholded, img_mat, contours);
 
-					SendMessage(contours, image, mosq);
+						SendMessage(contours, image, mosq);
 
-					texture = new sf::Texture;
-					texture->loadFromImage(*result);
+						texture.update(*result);
 
-					sprite = new sf::Sprite;
-					sprite->setTexture(*texture);
-					sprite->setPosition(5, 5);
+						sprite.setTexture(texture);
+						sprite.setPosition(5, 5);
 
-					recieved.payload = nullptr;
-					contours.clear();
+						recieved.payload = nullptr;
+						contours.clear();
+
+						delete result;
+						delete img_mat;
+						delete thresholded;
+					}
+
 					delete image;
-					delete result;
-					delete img_mat;
-					delete thresholded;
 				}
 				else if (topic == topics[1])
 				{
@@ -113,16 +109,10 @@ int main()
 		}
 		
 		message_lock.unlock();
-
-		window.clear();
-		window.draw(*sprite);
+		
+		window.clear(sf::Color(31, 206, 203, 255));
+		window.draw(sprite);
 		window.display();
-
-		if (sprite != nullptr && texture != nullptr)
-		{
-			//delete texture;//????
-			//delete sprite;//????
-		}
 	}
 
 	if (mosq)

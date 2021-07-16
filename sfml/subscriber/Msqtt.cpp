@@ -7,9 +7,10 @@ int cnt = 1;
 std::vector<std::string> topics
 { 
 	"/image",
-	"/command/auto",
+	"/command/auto",// первое число - 4(вращение);34 
 	"/command/manual",
-	"/command/mode" 
+	"/command/mode",
+	"/state"
 };
 
 void OnConnect(struct mosquitto* mosc, void* obj, int rc)
