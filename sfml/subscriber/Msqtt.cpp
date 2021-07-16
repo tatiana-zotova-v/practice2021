@@ -1,30 +1,44 @@
 #include "Msqtt.h"
 
 std::mutex message_lock;
-struct mosquitto_message recieved;// = nullptr;
-//extern struct mosquitto_message** recievedPtr = &recieved;
+struct mosquitto_message recieved;
 int cnt = 1;
 
-myMosq::myMosq(const char* _id, const char* _topic, const char* _host, int _port) : mosquittopp(_id)
-{
-	mosqpp::lib_init();       
-	this->keepalive = 60;    
-	this->id = _id;
-	this->port = _port;
-	this->host = _host;
-	this->topic = _topic;
-	connect_async(host,     
-		port,
-		keepalive);
-	loop_start();            
+std::vector<std::string> topics
+{ 
+	"/image",
+	"/command/auto",
+	"/command/manual",
+	"/command/mode" 
 };
 
-myMosq::~myMosq() {
-	loop_stop();            
-	mosqpp::lib_cleanup();    
+void OnConnect(struct mosquitto* mosc, void* obj, int rc)
+{
+	std::cout << ">> MQTT connected " << rc << std::endl;
 }
 
-void myMosq::send_message(const std::vector<std::vector<cv::Point>>& contours, const sf::Image& img)
+void OnPublish(struct mosquitto* mosc, void* obj, int mid)
+{
+	std::cout << "The message with " << mid << " has been published" << std::endl;
+}
+
+void OnSubscribe(struct mosquitto* mosc, void* obj, int mid, int qos_count, const int* granted_qos)
+{
+	std::cout << "aoaoaoa subscribe!!!! aoaoao" << std::endl;
+}
+		
+void OnMessage(struct mosquitto* mosc, void* obj, const struct mosquitto_message* message)
+{
+	std::cout << "Yaaaahooo we have got a new message" << std::endl;
+	mosquitto_message_copy(&recieved, message);
+}
+
+void OnDisconnect(struct mosquitto* mosc, void* obj, int rc)
+{
+	std::cout << ">> MQTT disconnected " << rc << std::endl;
+}
+
+void SendMessage(const std::vector<std::vector<cv::Point>>& contours, sf::Image* img, struct mosquitto* mosq)
 {
 	float angle;
 	int mid = 2; // NULL mojno
@@ -35,57 +49,25 @@ void myMosq::send_message(const std::vector<std::vector<cv::Point>>& contours, c
 		if (toManual) toManual = 0;
 		float point = GetCentralPoint(contours, img);
 		angle = Radian2Degrees(GetAngle(point));
-		publish(&mid, "topic", sizeof(float), &angle, 2);//ugol
-		publish(&mid, "topic", sizeof(float), &angle, 2);//spat'
-		publish(&mid, "topic", sizeof(float), &angle, 2);//idti
+		mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//ugol
+		mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//spat'
+		mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//idti
 //		std::cout << "point " << point << std::endl;
 	}
 	else
 	{
 		if (toManual > 5)
 		{
-			publish(&mid, "topic", sizeof(float), &angle, 2);//spat' 0.5	
-			publish(&mid, "topic", sizeof(float), &angle, 2);//perehod manual
+			mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//spat' 0.5	
+			mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//perehod manual
 			toManual = 0;
 		}
 		else
 		{
 			toManual++;
 			angle = 60;
-			publish(&mid, "topic", sizeof(float), &angle, 2);
-			publish(&mid, "topic", sizeof(float), &angle, 2);//spat' 0.5			
+			mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);
+			mosquitto_publish(mosq, &mid, "topic", sizeof(float), &angle, 2, 1);//spat' 0.5			
 		}
 	}
-}
-
-void myMosq::on_disconnect(int rc) {
-	std::cout << ">> myMosq - disconnection(" << rc << ")" << std::endl;
-}
-
-void myMosq::on_connect(int rc)
-{
-	if (rc == 0) {
-		std::cout << ">> myMosq - connected with server" << std::endl;
-	}
-	else {
-		std::cout << ">> myMosq - Impossible to connect with server(" << rc << ")" << std::endl;
-	}
-}
-
-void myMosq::on_publish(int mid)
-{
-	std::cout << ">> myMosq - Message (" << mid << ") succeed to be published " << std::endl;
-}
-
-void myMosq::on_message(const struct mosquitto_message* message) {
-	std::cout << ">> myMosq recieved message" << std::endl;
-
-//	recieved = static_cast<mosquitto_message*>(malloc(sizeof(message)));
-	message_lock.lock();
-	//mosquitto_message_free(recievedPtr);
-	//recieved = static_cast<mosquitto_message*>(malloc(sizeof(message)));//recieved = new mosquitto_message;
-	//recievedPtr = &recieved;
-	mosquitto_message_copy(&recieved, message);
-	message_lock.unlock();
-//	cnt = 0;
 }

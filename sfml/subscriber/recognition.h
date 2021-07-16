@@ -10,14 +10,16 @@
 #include <cmath>
 
 extern const float radian;
+extern enum Object;
 
-cv::Mat sfml2opencv(const sf::Image& img);
-cv::Mat GetThresholdedMat(const cv::Mat& mat);
-sf::Image GetCountorsPic(const cv::Mat& thresholded
-	, cv::Mat& img
-	, std::vector<std::vector<cv::Point>>& contours);
-float GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours, const sf::Image& img);
-float DefineGreen(const sf::Image& img);
+cv::Mat sfml2opencv(sf::Image* img);
+cv::Mat GetThresholdedMat(cv::Mat* mat/*, Object toFind*/);
+sf::Image GetCountorsPic(cv::Mat* thresholded
+					   , cv::Mat* img
+					   , std::vector<std::vector<cv::Point>>& contours);
+float GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours
+					, sf::Image* img);
+//float DefineGreen(const sf::Image& img);
 float GetAngle(float pointX);
 float Radian2Degrees(float angle);
 

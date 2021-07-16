@@ -2,31 +2,21 @@
 
 #include "recognition.h"
 #include <iostream>
-#include <mosquittopp.h>
+#include <mosquitto.h>
 #include <mutex>
-#pragma comment (lib, "mosquittopp.lib")
+#include <string>
+
 #pragma comment (lib, "mosquitto.lib")
 
 extern std::mutex message_lock;
 extern struct mosquitto_message recieved;
 //extern struct mosquitto_message** recievedPtr;
-extern int cnt;
+extern std::vector<std::string> topics;
 
-class myMosq : public mosqpp::mosquittopp
-{
-private:
-	const char* host;
-	const char* id;
-	const char* topic;
-	int         port;
-	int         keepalive;
+void OnConnect(struct mosquitto* mosc, void* obj, int rc);
+void OnPublish(struct mosquitto* mosc, void* obj, int mid);
+void OnSubscribe(struct mosquitto* mosc, void* obj, int mid, int qos_count, const int* granted_qos);
+void OnMessage(struct mosquitto* mosc, void* obj, const struct mosquitto_message* message);
+void OnDisconnect(struct mosquitto* mosc, void* obj, int rc);
 
-	void on_connect(int rc);
-	void on_disconnect(int rc);
-	void on_publish(int mid);
-	void on_message(const struct mosquitto_message* message);
-public:
-	myMosq(const char* id, const char* _topic, const char* host, int port);
-	~myMosq();
-	void send_message(const std::vector<std::vector<cv::Point>>& contours, const sf::Image& img);
-};
+void SendMessage(const std::vector<std::vector<cv::Point>>& contours, sf::Image* img, struct mosquitto* mosq);
