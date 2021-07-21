@@ -39,9 +39,9 @@ namespace window_core
 
         public void InitializeClient()
         {
-            //Console.WriteLine("\tEnter brokerHostName in format X.X.X.X or empty for localhost");
-            //string enterLine = Console.ReadLine();
-            //if (!(enterLine.Length == 0)) { brokerHostName = enterLine; }
+            Console.WriteLine("\tEnter brokerHostName in format X.X.X.X or empty for localhost");
+            string enterLine = Console.ReadLine();
+            if (!(enterLine.Length == 0)) { brokerHostName = enterLine; }
             client = new MqttClient(brokerHostName);
             try
             {
@@ -138,8 +138,6 @@ namespace window_core
         {
             mode = new VideoMode(x, y);
             window = new RenderWindow(mode, windowTitle, Styles.Close);
-            //icon = new Image("bot.png");
-            //window.SetIcon(48, 48, icon.Pixels);
             window.KeyPressed += WindowKeyPressed;
             window.MouseButtonPressed += WindowMouseButtonPressed;
             window.Closed += WindowClosed;
@@ -225,8 +223,6 @@ namespace window_core
     public enum Commands
     {
         PAUSE = 0,
-        //CHECK_ROTATION = 1,
-        //CHECK_MOVING = 2,
         AUTO_MODE = 1,
         MANUAL_MODE = 2,
         STR_M_F = 5,
@@ -381,7 +377,7 @@ namespace window_core
                 List<(string, string)> commands = new List<(string, string)>();
                 commands.Add(("0;0.5", MQTTClient.autoTopic));
                 commands.Add(("2", MQTTClient.modeTopic));
-                Console.WriteLine("так и не нашел -> мануал");
+                Console.WriteLine("Объект не найден, выполнен переход в ручной режим");
                 return commands;
             }
             else
@@ -394,7 +390,7 @@ namespace window_core
                         catched = true;
                         commands.Add(("0;0.5", MQTTClient.autoTopic));
                         commands.Add(("3;0.35", MQTTClient.autoTopic));
-                        Console.WriteLine("взял " + name);
+                        Console.WriteLine("Захватил " + name);
                         return commands;
                     }
                     else
@@ -406,8 +402,7 @@ namespace window_core
                         commands.Add(("4;" + (Math.Round(angleToTurn)).ToString(), MQTTClient.autoTopic));
                         commands.Add(("0;0.5", MQTTClient.autoTopic));
                         commands.Add(("3;1", MQTTClient.autoTopic));
-                        //commands.Add(("0;0.5", MQTTClient.autoTopic));
-                        Console.WriteLine("вижу " + name + " повернул на " + (Math.Round(angleToTurn)).ToString());
+                        Console.WriteLine("Распознан " + name + ", поворот на " + (Math.Round(angleToTurn)).ToString());
                         return commands;
                     }
                 }
@@ -417,7 +412,7 @@ namespace window_core
                     commands.Add(("0;0.5", MQTTClient.autoTopic));
                     commands.Add(("4;35", MQTTClient.autoTopic));
                     noResult++;
-                    Console.WriteLine("не нашел " + name + " продолжаю поиск");
+                    Console.WriteLine("Не распознал " + name + ",продолжаю поиск");
                     return commands;
                 }
             }
@@ -453,7 +448,6 @@ namespace window_core
         public List<(string, string)> Stop()
         {
             List<(string, string)> commands = new List<(string, string)>();
-            //commands.Add(("0;2", MQTTClient.autoTopic));
             commands.Add(("3;-2", MQTTClient.autoTopic));
             commands.Add(("2", MQTTClient.modeTopic));
             return commands;

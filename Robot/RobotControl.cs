@@ -1,6 +1,4 @@
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using uPLibrary.Networking.M2Mqtt;
 using uPLibrary.Networking.M2Mqtt.Messages;
 using UnityEngine;
@@ -32,12 +30,10 @@ public class RobotControl : MonoBehaviour
     public enum Commands
     {
         PAUSE = 0,
-        //auto
         CHECK_ROTATION = 1,
         CHECK_MOVING = 2,
         STR_M = 3,
         ROT = 4,
-        //manual
         STR_M_F = 5,
         STR_M_B = 6,
         ROT_R = 7,
@@ -199,12 +195,9 @@ public class RobotControl : MonoBehaviour
                 image.Apply();
 
                 byte[] bytes = image.EncodeToPNG();
-                //byte[] pixels = image.GetRawTextureData();
                 RenderTexture.active = null;
                 camera.targetTexture = null;
                 camera.targetDisplay = 1;
-                //File.WriteAllBytes("D:/Capture/" + Time.time + ".bin", pixels);;
-                //File.WriteAllBytes("D:/Capture/" + Time.time + ".jpg", bytes);
 
                 cachedClient.PublishImage(bytes);
                 time = 0;
