@@ -160,7 +160,7 @@ namespace window_core
                     if (RecoObject.command == Commands.END_OF_STATE_SEQUENCE)
                     {
                         List<(string, string)> commands;
-                        if (!puck.catched)
+                        if (!puck.caught)
                         {
                             puck.CreateImage(MQTTClient.recivedImageBytes);
                             puck.Recognize();
@@ -172,7 +172,7 @@ namespace window_core
                             gate.CreateImage(MQTTClient.recivedImageBytes);
                             gate.Recognize();
 
-                            if (gate.catched)
+                            if (gate.caught)
                             {
                                 commands = gate.Stop();
                             }
@@ -336,7 +336,7 @@ namespace window_core
         public string name { get; set; }
         private int noResult { get; set; } = 0;
         private int maxNoResult { get; set; } = 10;
-        public bool catched { get; set; }
+        public bool caught { get; set; }
         public static Commands command { get; set; } = Commands.IN_SEQUENCE;
 
         public int time = 0;
@@ -387,7 +387,7 @@ namespace window_core
                     if (Catch())
                     {
                         List<(string, string)> commands = new List<(string, string)>();
-                        catched = true;
+                        caught = true;
                         commands.Add(("0;0.5", MQTTClient.autoTopic));
                         commands.Add(("3;0.35", MQTTClient.autoTopic));
                         Console.WriteLine("Захватил " + name);
@@ -396,7 +396,7 @@ namespace window_core
                     else
                     {
                         List<(string, string)> commands = new List<(string, string)>();
-                        catched = false;
+                        caught = false;
                         double xPos = Convert.ToDouble((rectangles[0].X + rectangles[0].Width / 2)) / Convert.ToDouble(image.Width);
                         double angleToTurn = Convert.ToDouble(Math.Atan((xPos - 0.5d) * 0.44d / 0.22d) * 180d / Math.PI);
                         commands.Add(("4;" + (Math.Round(angleToTurn)).ToString(), MQTTClient.autoTopic));
@@ -410,7 +410,7 @@ namespace window_core
                 {
                     List<(string, string)> commands = new List<(string, string)>();
                     commands.Add(("0;0.5", MQTTClient.autoTopic));
-                    commands.Add(("4;35", MQTTClient.autoTopic));
+                    commands.Add(("4;45", MQTTClient.autoTopic));
                     noResult++;
                     Console.WriteLine("Не распознал " + name + ",продолжаю поиск");
                     return commands;

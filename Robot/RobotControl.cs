@@ -14,12 +14,12 @@ public class RobotControl : MonoBehaviour
 
     public enum ControlType
     {
-        NO = 0,
+        WAITING = 0,
         AUTO,
         MANUAL
     }
 
-    public static ControlType controlType { get; set; } = ControlType.NO;
+    public static ControlType controlType { get; set; } = ControlType.WAITING;
 
     public enum FindingStates
     {
