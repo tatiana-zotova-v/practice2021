@@ -6,7 +6,7 @@
 
 int main()
 {
-	Operator RobotControl("Operator", "127.0.0.1", 1883, 1, 2);
+	Operator RobotControl("Operator", "127.0.0.1", 1883, false, 2);
 
 	MainWindow window;
 

@@ -11,11 +11,18 @@
 
 extern const float radian;
 
+enum class FindingStates
+{
+	FINDING_PUCK,
+	FINDING_GOAL,
+	FOUND_ALL,
+};
+
 cv::Mat sfml2opencv(const sf::Image& img);
-cv::Mat GetThresholdedMat(cv::Mat& mat/*, Object toFind*/);
+cv::Mat GetThresholdedMat(cv::Mat& mat, FindingStates state);
 sf::Image GetCountorsPic(const cv::Mat& thresholded, cv::Mat& img, std::vector<std::vector<cv::Point>>& contours);
-float GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours, uint imgSizeX);
-sf::Image DefineGreen(const sf::Image& img, std::vector<std::vector<cv::Point>>& contours);
+cv::Point2f GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours, const sf::Vector2u& imgSize);
+sf::Image DefineObj(const sf::Image& img, std::vector<std::vector<cv::Point>>& contours, FindingStates state);
 int Round(float num);
 int GetAngle(float pointX);
 float Radian2Degrees(float angle);

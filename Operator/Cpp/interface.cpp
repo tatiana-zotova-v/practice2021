@@ -102,9 +102,9 @@ Button& Button::operator=(const Button& button)
 	height = button.height;
 	command = button.command;
 	box.setSize(sf::Vector2f(width, height));
-	box.setFillColor(sf::Color(118, 159, 205, 255));//(119, 144, 210, 255));//67, 102, 176
+	box.setFillColor(sf::Color(118, 159, 205, 255));
 	box.setPosition(x, y);
-	box.setOutlineThickness(1);
+	box.setOutlineThickness(0);
 	box.setOutlineColor(sf::Color(109, 138, 199, 255));
 
 	return *this;
@@ -145,29 +145,29 @@ void Joystick::Move(int x, int y)
 	moveBackward.Move(x, y);
 }
 
-int Joystick::IsClicked(const sf::Vector2i& mouse)
+Commands Joystick::IsClicked(const sf::Vector2i& mouse)
 {
 	if (moveForward.IsClicked(mouse))
 	{
-		return static_cast<int>(moveForward.GetCommand());
+		return moveForward.GetCommand();
 	}
 	else if (moveBackward.IsClicked(mouse))
 	{
-		return static_cast<int>(moveBackward.GetCommand());
+		return moveBackward.GetCommand();
 	}
 	else if (rotateLeft.IsClicked(mouse))
 	{
-		return static_cast<int>(rotateLeft.GetCommand());
+		return rotateLeft.GetCommand();
 	}
 	else if (rotateRight.IsClicked(mouse))
 	{
-		return static_cast<int>(rotateRight.GetCommand());
+		return rotateRight.GetCommand();
 	}
 	else if (stop.IsClicked(mouse))
 	{
-		return static_cast<int>(stop.GetCommand());
+		return stop.GetCommand();
 	}
-	return -1;
+	return Commands::DEFAULT;
 }
 
 void Joystick::draw(sf::RenderTarget& target, sf::RenderStates states) const
@@ -187,18 +187,20 @@ MainWindow::MainWindow()
 	icon.loadFromFile("C:/Users/MI/QtProject/bot_HMI/bot.png");
 	window.setIcon(48, 48, icon.getPixelsPtr());
 
-	mainTexture.loadFromFile("C:/Users/MI/QtProject/bot_HMI/N0YPJp.jpg");//начальная картинка 
+	mainTexture.loadFromFile("C:/Users/MI/QtProject/bot_HMI/hok.jpg");
 
 	mainSprite.setTexture(mainTexture);
 	mainSprite.setPosition(5, 5);
 
-	helperTexture.loadFromFile("C:/Users/MI/QtProject/bot_HMI/Helper.png");
+	helperTexture.loadFromFile("C:/Users/MI/QtProject/bot_HMI/Helper2.png");
 	helperSprite.setTexture(helperTexture);
-	helperSprite.setPosition(282, 499);
+	helperSprite.setPosition(232, 474);
 
-	joystick.Move(65, 652);
-	autoMode = Button(50, 580, 100, 50, "Auto", Commands::AUTO_MODE);
-	manualMode = Button(160, 580, 100, 50, "Manual", Commands::MANUAL_MODE);
+	joystick.Move(65, 627);
+	autoMode = Button(50, 555, 100, 50, "Auto", Commands::AUTO_MODE);
+	autoMode.Label::Move(18, 2);
+	manualMode = Button(160, 555, 100, 50, "Manual", Commands::MANUAL_MODE);
+	manualMode.Label::Move(4, 2);
 }
 
 void MainWindow::DrawAll()
@@ -238,21 +240,29 @@ void MainWindow::MainCycle(Operator& client)
 				if (event.mouseButton.button == sf::Mouse::Left)
 				{
 					sf::Vector2i mouse = sf::Mouse::getPosition(window);
-					if (joystick.IsClicked(mouse) != -1)
+
+					ControlType modeClient = client.GetMode();
+
+					if (manualMode.IsClicked(mouse) && modeClient != ControlType::MANUAL)
 					{
-						uint8_t command = joystick.IsClicked(mouse) + '0';
-						client.SendCommand(topics[2], &command, 1);
+						uint8_t command = static_cast<int>(manualMode.GetCommand()) + '0';
+						client.SendCommand(topics[3], &command, 1);
+						client.SetMode(ControlType::MANUAL);
 					}
-					else if (autoMode.IsClicked(mouse))
+					else if (autoMode.IsClicked(mouse) && modeClient != ControlType::AUTO)
 					{
 						uint8_t command = static_cast<int>(autoMode.GetCommand()) + '0';
 						client.SendCommand(topics[3], &command, 1);
+						client.SetMode(ControlType::AUTO);
 					}
-					else if (manualMode.IsClicked(mouse))
+					else if (modeClient == ControlType::MANUAL)
 					{
-						uint8_t command = static_cast<int>(manualMode.GetCommand()) + '0';
-						std::cout << command << std::endl;
-						client.SendCommand(topics[3], &command, 1);
+						Commands Clicked = joystick.IsClicked(mouse);
+						if (Clicked != Commands::DEFAULT)
+						{
+							uint8_t command = static_cast<int>(Clicked) + '0';
+							client.SendCommand(topics[2], &command, 1);
+						}
 					}
 				}
 			}
@@ -267,10 +277,9 @@ void MainWindow::MainCycle(Operator& client)
 				if (topic == topics[0])
 				{
 					sf::Image* result = new sf::Image;
-
-					*result = client.ParsePic();
+					if (client.GetMode() == ControlType::AUTO && client.GetState() != FindingStates::FOUND_ALL) *result = client.ParsePic();
+					else result->loadFromMemory(recieved.payload, recieved.payloadlen);
 					UpdateSprite(*result);
-
 					delete result;
 				}
 				else if (topic == topics[4])
@@ -278,6 +287,7 @@ void MainWindow::MainCycle(Operator& client)
 					client.ParseCommand();
 				}
 			}
+			recieved.payload = nullptr;
 		}
 		message_lock.unlock();
 

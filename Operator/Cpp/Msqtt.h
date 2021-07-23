@@ -23,6 +23,7 @@ enum class Commands
 	ROT_L = 8,
 	END_OF_STATE_SEQUENCE = 9,
 	IN_SEQUENCE = 10,
+	DEFAULT = 11,
 };
 
 enum class ControlType
@@ -30,12 +31,6 @@ enum class ControlType
 	NO, 
 	AUTO, 
 	MANUAL,
-};
-
-enum class FindingStates
-{
-	FINDING_PUCK, 
-	FINDING_GOAL,
 };
 
 void OnConnect(struct mosquitto* mosc, void* obj, int rc);
@@ -66,6 +61,12 @@ public:
 	Commands CurrentBotState();
 	sf::Image ParsePic();
 	void ParseCommand();
+	void SetState(FindingStates state_);
+	void SetMode(ControlType type);
+	FindingStates GetState() const;
+	ControlType GetMode() const;
+	bool EndOfFind(FindingStates state_, const std::vector<std::vector<cv::Point>>& contours, const sf::Vector2u& imgSize);
+
 private:
 	ControlType mode;
 	FindingStates state;

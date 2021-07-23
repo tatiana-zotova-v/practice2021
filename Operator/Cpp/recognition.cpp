@@ -10,36 +10,36 @@ cv::Mat sfml2opencv(const sf::Image& img)
 	return mat.clone();
 }
 
-cv::Mat GetThresholdedMat(cv::Mat& mat)
+cv::Mat GetThresholdedMat(cv::Mat& mat, FindingStates state)
 {
-	int hueFrom = 50;
-	int hueTo = 70;
+	int hueFrom = 0;
+	int hueTo = 180;
 
-	int saturationFrom = 110;
+	int saturationFrom = 0;
 	int saturationTo = 255;
 
-	int valueFrom = 100;
+	int valueFrom = 0;
 	int valueTo = 255;
-	/*
-	if (toFind == PUCK)
-	{
-		hueFrom = 40;
-		hueTo = 80;
 
-		valueFrom = 180;
+	if (state == FindingStates::FINDING_PUCK)
+	{
+		hueFrom = 50;
+		hueTo = 70;
+		saturationFrom = 110;
+		saturationTo = 255;
+		valueFrom = 100;
+		valueTo = 255;
 	}
-	else if (toFind == GOAL)
+	else if (state == FindingStates::FINDING_GOAL)
 	{
 		hueFrom = 110;
 		hueTo = 130;
+		saturationFrom = 130;
+		saturationTo = 255;
+		valueFrom = 80;
+		valueTo = 255;
+	}
 
-		valueFrom = 90;
-	}
-	else
-	{
-		//throw exception?
-	}
-	*/
 	cv::Mat thresholded;
 	cv::cvtColor(mat, thresholded, cv::COLOR_BGR2HSV);
 
@@ -105,19 +105,22 @@ sf::Image GetCountorsPic(const cv::Mat& thresholded, cv::Mat& img, std::vector<s
 	return image;
 }
 
-float GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours, uint imgSizeX)
+cv::Point2f GetCentralPoint(const std::vector<std::vector<cv::Point>>& contours, const sf::Vector2u& imgSize)
 {
-	cv::Rect rect = cv::boundingRect(contours[0]);
-	return static_cast<float>(rect.x + rect.width / 2) / static_cast<float>(imgSizeX);
+	cv::Rect2f rect = cv::boundingRect(contours[0]);
+	cv::Point2f central(
+		static_cast<float>(rect.x + rect.width / 2) / static_cast<float>(imgSize.x)
+	  , static_cast<float>(rect.y + rect.height / 2) / static_cast<float>(imgSize.y)
+	);
+	return central;
 }
 
-sf::Image DefineGreen(const sf::Image& img, std::vector<std::vector<cv::Point>>& contours) {
+sf::Image DefineObj(const sf::Image& img, std::vector<std::vector<cv::Point>>& contours, FindingStates state)
+{
 	cv::Mat img_mat = sfml2opencv(img);
-	cv::Mat thresholded = GetThresholdedMat(img_mat);
-
-	sf::Image result = GetCountorsPic(thresholded, img_mat, contours);
-	bool found = (contours.size() == 1);
-	return result;
+	cv::Mat thresholded = GetThresholdedMat(img_mat, state);
+	sf::Image contoured = GetCountorsPic(thresholded, img_mat, contours);
+	return contoured;
 }
 
 int Round(float num)
@@ -140,8 +143,8 @@ int Round(float num)
 int GetAngle(float pointX)
 {
 	pointX -= 0.5;
-	pointX *= 0.6;
-	pointX /= 0.3;
+	pointX *= 0.44;
+	pointX /= 0.22;
 	float angle = Radian2Degrees(std::atanf(pointX));
 	return Round(angle);
 }

@@ -23,7 +23,7 @@ private:
 	virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const;
 };
 
-class Button : public Label//, public sf::Drawable
+class Button : public Label
 {
 public:
 	Button(int x_, int y_, int width_, int height_, std::string text_, Commands command_);
@@ -45,7 +45,7 @@ class Joystick : public sf::Drawable
 public:
 	Joystick(int x, int y);
 	void Move(int x, int y);
-	int IsClicked(const sf::Vector2i& mouse);
+	Commands IsClicked(const sf::Vector2i& mouse);
 private:
 	Button moveForward;
 	Button moveBackward;
